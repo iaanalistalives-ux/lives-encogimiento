@@ -17,6 +17,8 @@ Un solo archivo: `index.html` (GitHub Pages). Un solo enlace para todos: el men�
 | VER (quien no está en la lista) | Programa y Búsqueda solo para ver |
 | SUPERVISION (rcamogliano) | Ve todo, la base no le guarda nada |
 
+Llegada de tela (desde el 11/11/2026): «Registrar llegada de tela» abre una ventana encima de Telas de producción (dos columnas en PC, pantalla completa en celular; ✕ Cerrar, Escape o toque en el fondo; con datos escritos pregunta «¿Salir sin guardar?»). «Lo último registrado» (20 telas más nuevas) va dentro de la ventana, plegado, y se abre solo tras grabar. Los campos de elegir usan una lista corta propia (hasta 12 opciones, se filtra al escribir), no el desplegable del navegador.
+
 Fuera del portal (link sin `?usuario=`) sale el botón «Identificarme»: se escribe el usuario del portal.
 
 ## Base (Supabase, prefijo `encog_`)

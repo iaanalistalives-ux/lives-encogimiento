@@ -475,6 +475,7 @@ max-height:240px;overflow:auto;box-shadow:var(--sh-h);}
 .sug div:first-child{border-top:none;}
 .sug div.sel{background:#E7F4EF;}
 .sug div.add{color:var(--taupe);font-weight:700;}
+.sug div.pista{color:var(--stone);font-size:12.5px;cursor:default;padding:8px 14px;}
 .acciones{display:flex;gap:10px;flex-wrap:wrap;margin-top:22px;}
 .acciones .btn{min-height:48px;padding:12px 22px;font-size:15px;}
 .acciones .btn.primary{flex:1 1 240px;}
@@ -498,6 +499,33 @@ tr.no td{background:#FFF7F7;}
 .codigo{font-size:44px;font-weight:700;color:var(--sage);letter-spacing:-1px;line-height:1.05;margin:6px 0 4px;}
 
 /* ----- ventanas (ficha y confirmaciones) ----- */
+/* ventana del registro de llegada de tela (11nov-3): casi a pantalla completa; completa en celular */
+#pTelaForm .vfondo{position:fixed;inset:0;background:rgba(14,59,54,.55);z-index:45;display:flex;
+align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto;}
+#pTelaForm .vcaja{max-width:820px;width:100%;margin:auto;border-radius:var(--r);overflow:hidden;
+box-shadow:0 12px 40px rgba(14,59,54,.35);}
+#pTelaForm .vcab{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px;
+background:var(--petrol);color:#fff;font-weight:700;font-size:16px;border-bottom:3px solid var(--emer);}
+#pTelaForm .vcerrar{background:none;border:1px solid rgba(255,255,255,.45);color:#fff;border-radius:8px;
+padding:8px 14px;font-weight:700;font-size:14px;cursor:pointer;min-height:40px;white-space:nowrap;}
+#pTelaForm .vcerrar:hover{background:rgba(255,255,255,.08);}
+#pTelaForm .vcuerpo .panel{margin:0;border-radius:0;max-width:none;width:auto;}
+#pTelaForm .vcuerpo .panel>.pt,#pTelaForm .vcuerpo .panel>.ph,#pTelaForm .vcuerpo .panel>.sec{display:none;}
+#pTelaForm .vcuerpo .panel>.campo:first-of-type{margin-top:14px;}
+/* en PC los campos van en dos columnas, para que el registro no se alargue */
+@media(min-width:701px){
+  #pTelaForm .fcard{display:grid;grid-template-columns:1fr 1fr;column-gap:18px;align-items:start;}
+  #pTelaForm .fcard>*{grid-column:1 / -1;}
+  #pTelaForm .fcard>.campo{grid-column:auto;}
+}
+#pTelaForm .vpie{background:var(--card);padding:0 18px 16px;}
+#pTelaForm #telRecientes .panel{border-top:1px solid var(--warm-light);}
+#pTelaForm #telRecientes .ph{display:none;}
+@media(max-width:700px){
+  #pTelaForm .vfondo{padding:0;}
+  #pTelaForm .vcaja{border-radius:0;min-height:100%;display:flex;flex-direction:column;}
+  #pTelaForm .vcuerpo{flex:1;}
+}
 .fondo{position:fixed;inset:0;background:rgba(14,59,54,.5);z-index:50;display:flex;
 align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto;}
 #capaNombre .fondo{z-index:70;}
@@ -1311,8 +1339,17 @@ html.lsPoOn body>*:not(#lsPo){visibility:hidden!important}
   </section>
 
   <section id="pTelaForm" hidden>
-    <div id="telFormArea"></div>
-    <div id="telRecientes"></div>
+    <div class="vfondo" id="telVentFondo">
+      <div class="vcaja" role="dialog" aria-modal="true" aria-label="Llegada de tela de producción">
+        <div class="vcab"><span>Llegada de tela de producción</span>
+          <button class="vcerrar" type="button" onclick="cerrarTelaForm()">&#10005; Cerrar</button></div>
+        <div class="vcuerpo">
+          <div id="telFormArea"></div>
+          <div class="vpie"><button class="btn" id="btnRecientes" type="button" aria-expanded="false" onclick="verRecientes()">Ver lo último registrado</button></div>
+          <div id="telRecientes" hidden></div>
+        </div>
+      </div>
+    </div>
   </section>
 
   <!-- ============== ENLACE CON UN ÁREA QUE NO EXISTE ============== -->
@@ -1346,7 +1383,7 @@ var USUARIO_LINK = '';
 
 /* Marca del archivo. No se ve en pantalla: se consulta escribiendo VERSION en
    la consola del navegador (F12 -> Consola). */
-var VERSION = 'ENC build 11nov-2';
+var VERSION = 'ENC build 11nov-3';
 
 /* Logo: lockup horizontal blanco de la skill lives-logo, en base64. Queda vacío
    porque la skill está instalada sin sus PNG; con esto vacío el header va sin
@@ -1600,7 +1637,7 @@ var MSG_CORT = 'Ese cortador no se encuentra en la base de datos. Elige tu códi
    el nombre completo y se pasa al campo siguiente. Si no coincide con nada,
    queda lo escrito. */
 function sugerenciaPara(input){
-  var dl = input.list;
+  var dl = input.list || (input.getAttribute('data-lista') ? el(input.getAttribute('data-lista')) : null);
   if(!dl) return null;
   var t = norm(input.value);
   if(!t) return null;
@@ -1617,7 +1654,7 @@ function sugerenciaPara(input){
 document.addEventListener('keydown', function(e){
   if(e.key !== 'Tab' || e.shiftKey) return;
   var x = e.target;
-  if(!x || x.tagName !== 'INPUT' || !x.list) return;
+  if(!x || x.tagName !== 'INPUT' || !(x.list || x.getAttribute('data-lista'))) return;
   var s = sugerenciaPara(x);
   if(!s) return;
   x.value = s;                                   // el Tab sigue su camino: pasa al campo siguiente
@@ -1681,18 +1718,88 @@ function ponerLista(idLista, valores){
   for(var i=0;i<(valores || []).length;i++) x += '<option value="' + esc(valores[i]) + '">';
   dl.innerHTML = x;
 }
+/* 11nov-3: la lista ya no es el desplegable del navegador (con cientos de
+   colores y partidas se abría hasta el fondo de la pantalla). Es una lista corta
+   propia: muestra hasta 12 opciones y se filtra al escribir. */
 function campoElegir(id, etiqueta, valor, idLista, valores, ayuda, tela){
   return campoTexto(id, etiqueta, valor, idLista, valores, null, ayuda)
-    .replace('<input id="' + id + '"', '<input id="' + id + '" data-estricto="1"' + (tela ? ' data-tela="1"' : '') + ' placeholder="Elige de la lista"');
+    .replace(' list="' + idLista + '"', ' data-lista="' + idLista + '"')
+    .replace('<input id="' + id + '"', '<input id="' + id + '" data-estricto="1"' + (tela ? ' data-tela="1"' : '')
+        + ' placeholder="Escribe para buscar y elige" role="combobox" aria-expanded="false" aria-controls="sg_' + id + '"'
+        + ' onfocus="sugAbrir(this.id)" onkeydown="sugTecla(event,this.id)" onblur="sugBlur(this.id)"')
+    .replace('oninput="limpiarMarca(this.id)"', 'oninput="limpiarMarca(this.id);sugAbrir(this.id)"')
+    .replace('<div class="malmsg" id="m_' + id + '">', '<div class="sug" id="sg_' + id + '" role="listbox"></div><div class="malmsg" id="m_' + id + '">');
 }
+function listaDeCampo(e){
+  if(!e) return null;
+  return e.list || (e.getAttribute('data-lista') ? el(e.getAttribute('data-lista')) : null);
+}
+var SUG = { id:'', opc:[], i:0 };
+var SUG_TOPE = 12;
+function sugAbrir(id){
+  var e = el(id), s = el('sg_' + id), dl = listaDeCampo(e);
+  if(!e || !s || !dl) return;
+  var ops = dl.options, t = norm(e.value), exacta = [], a = [], b = [], total = 0, alt = '';
+  // el código de tela corto (JE2160) también encuentra JE002160
+  if(t && e.getAttribute('data-tela')){ var mt = t.replace(/[^A-Z0-9]/g, '').match(/^([A-Z]+)(\d+)$/); if(mt) alt = mt[1] + ('000000' + mt[2]).slice(-6); }
+  for(var i=0;i<ops.length;i++){
+    var v = ops[i].value, n = norm(v);
+    if(!v) continue;
+    if(!t){ total++; if(a.length < SUG_TOPE) a.push(v); continue; }
+    if(n === t || (alt && n === alt)){ exacta.push(v); total++; }
+    else if(n.indexOf(t) === 0){ a.push(v); total++; }
+    else if(n.indexOf(t) > 0){ b.push(v); total++; }
+  }
+  var opc = exacta.concat(a, b).slice(0, SUG_TOPE);
+  var yaElegido = opc.length === 1 && norm(opc[0]) === t;
+  if(yaElegido) opc = [];                                       // ya está elegido: no hace falta la lista
+  SUG = { id:id, opc:opc, i:0 };
+  var h = '';
+  for(var j=0;j<opc.length;j++){
+    h += '<div role="option" class="' + (j === 0 ? 'sel' : '') + '" onmousedown="sugElegir(event,\'' + id + '\',' + j + ')">' + esc(opc[j]) + '</div>';
+  }
+  if(opc.length && total > opc.length) h += '<div class="pista">Hay ' + total + '. Escribe para acotar.</div>';
+  if(!opc.length && t && !yaElegido) h = '<div class="pista">No está en la base de datos.</div>';
+  s.innerHTML = h;
+  s.className = h ? 'sug on' : 'sug';
+  e.setAttribute('aria-expanded', h ? 'true' : 'false');
+}
+function sugCerrar(id){
+  var s = el('sg_' + id), e = el(id);
+  if(s) s.className = 'sug';
+  if(e) e.setAttribute('aria-expanded', 'false');
+}
+function sugElegir(ev, id, j){
+  if(ev && ev.preventDefault) ev.preventDefault();          // el toque no le quita el foco al campo
+  var e = el(id);
+  if(!e || SUG.id !== id || !SUG.opc[j]) return;
+  e.value = SUG.opc[j];
+  sugCerrar(id);
+  limpiarMarca(id);
+  e.dispatchEvent(new Event('change', { bubbles:true }));
+}
+function sugTecla(ev, id){
+  var s = el('sg_' + id), abierta = s && s.className.indexOf('on') >= 0 && SUG.id === id && SUG.opc.length;
+  if(ev.key === 'ArrowDown' || ev.key === 'ArrowUp'){
+    if(!abierta){ sugAbrir(id); ev.preventDefault(); return; }
+    SUG.i = Math.max(0, Math.min(SUG.opc.length - 1, SUG.i + (ev.key === 'ArrowDown' ? 1 : -1)));
+    var d = s.querySelectorAll('[role=option]');
+    for(var i=0;i<d.length;i++) d[i].className = (i === SUG.i ? 'sel' : '');
+    if(d[SUG.i] && d[SUG.i].scrollIntoView) d[SUG.i].scrollIntoView({ block:'nearest' });
+    ev.preventDefault();
+  }
+  else if(ev.key === 'Enter'){ if(abierta){ sugElegir(ev, id, SUG.i); } }
+  else if(ev.key === 'Escape'){ if(s && s.className.indexOf('on') >= 0){ sugCerrar(id); ev.stopPropagation(); } }
+}
+function sugBlur(id){ setTimeout(function(){ if(document.activeElement !== el(id)) sugCerrar(id); }, 150); }
 /* ¿Lo que hay en el campo está en su lista? Si es el comienzo de una sola opción,
    la completa. El código de tela corto (JE2052) se busca también como JE002052. */
 function estrictoOk(id){
-  var e = el(id);
-  if(!e || !e.list) return true;
+  var e = el(id), dlE = listaDeCampo(e);
+  if(!e || !dlE) return true;
   var t = norm(e.value);
   if(!t){ e.value = ''; return true; }
-  var ops = e.list.options, hay = null, empiezan = [];
+  var ops = dlE.options, hay = null, empiezan = [];
   if(!ops.length) return true;                    // sin lista no se puede exigir (lo revisa la base al guardar)
   var alt = '';
   if(e.getAttribute('data-tela')){ var m = t.replace(/[^A-Z0-9]/g, '').match(/^([A-Z]+)(\d+)$/); if(m) alt = m[1] + ('000000' + m[2]).slice(-6); }
@@ -2052,6 +2159,7 @@ function cerrarNombre(){ el('capaNombre').innerHTML = ''; _luegoNombre = null; }
 /* ================== navegación ================== */
 var PANTALLAS = ['pMenu','pMenuArea','pPegar','pPrograma','pBuscar','pArea','pTelas','pTelaForm','pGraficos'];
 function mostrar(id){
+  if(id !== 'pTelaForm' && !el('modal').firstChild) document.body.style.overflow = '';
   for(var i=0;i<PANTALLAS.length;i++) el(PANTALLAS[i]).hidden = (PANTALLAS[i] !== id);
   window.scrollTo(0, 0);
 }
@@ -3192,10 +3300,14 @@ var TELA_ULTIMA = null;
 var CAMPOS_TELA = { llegada:'tlLlegada', cliente:'tlCliente', grupo:'tlGrupo', codigo:'tlCodigo', estilo:'tlEstilo',
   partida:'tlPartida', color:'tlColor', modelista:'tlModelista', obs:'tlObs' };
 
+/* 11nov-3: el registro se abre en una ventana encima de Telas de producción.
+   Se cierra con ✕ Cerrar, con Escape o tocando el fondo; si hay algo escrito
+   sin guardar, pregunta antes. Al cerrar, la lista de telas se actualiza sola. */
 function abrirTelaForm(pre){
-  mostrar('pTelaForm'); atras(true);
-  titulo('LLEGADA DE TELA DE PRODUCCIÓN', 'Una hoja blanca por tela');
-  cargarRecientes();
+  if(el('pTelaForm').hidden) verRecientes(false);
+  el('pTelaForm').hidden = false;
+  document.body.style.overflow = 'hidden';
+  el('telVentFondo').scrollTop = 0;
   if(OPC && CAT){ pintarTelaForm(pre); return; }
   el('telFormArea').innerHTML = cargando('Preparando el formulario...');
   srv('getOpciones', undefined, function(r){
@@ -3216,19 +3328,17 @@ function pintarTelaForm(pre){
     + campoFechaHora('tlLlegada', 'Fecha y hora de llegada *', pre.llegada || ahoraDMAHM(), 'Cuándo llegó la tela a la planta.')
     + campoElegir('tlCliente', 'Cliente *', pre.cliente, 'lTCli', catClientes())
     + campoElegir('tlModelista', 'Modelista', pre.modelista, 'lTMod', o.modelistas,
-        'Quién la va a revisar, si ya se sabe. Escribe el comienzo del nombre y presiona Tab.')
+        'Quién la va a revisar, si ya se sabe.')
     + '<div class="sec">De la hoja blanca</div>'
     + campoElegir('tlGrupo', 'Grupo *', pre.grupo, 'lTGru', catGrupos(pre.cliente))
     + campoElegir('tlCodigo', 'Código de tela *', pre.codigo, 'lTCod', catDe('t', pre.grupo), null, true)
     + campoPersonas('tlEstilo', 'Estilos *', catDe('e', pre.grupo), pre.estilo, false,
-        'Elige todos los estilos de la hoja: escribe el comienzo y elige de la lista. Al grabar se crea una fila por estilo, con la misma tela. '
-        + 'Si hay varias partidas, va un solo estilo.',
+        'Todos los estilos de la hoja. Con varias partidas va un solo estilo.',
         { min:1, separar:true, sinAviso:true, placeholder:'Elige el estilo de la lista',
           limite:function(){ return (PERSONAS.tlPartida && PERSONAS.tlPartida.sel.length >= 2) ? 1 : 99; },
           msgLimite:'Ya hay varias partidas: con varias partidas va un solo estilo (no se mezclan).' })
     + campoPersonas('tlPartida', 'Partidas *', catPartidas(pre.grupo), pre.partida, false,
-        'La partida de la hoja, elegida de la lista. Si un mismo estilo llega en varias partidas, ponlas todas: se crea una fila por partida, '
-        + 'con el mismo estilo. Si hay varios estilos, va una sola partida.',
+        'La partida de la hoja. Con varios estilos va una sola partida.',
         { min:1, separar:true, sinAviso:true, placeholder:'Elige la partida de la lista',
           limite:function(){ return (PERSONAS.tlEstilo && PERSONAS.tlEstilo.sel.length >= 2) ? 1 : 99; },
           msgLimite:'Ya hay varios estilos: con varios estilos va una sola partida (no se mezclan).',
@@ -3270,6 +3380,25 @@ function llenarDePartida(p){
   if(!r) return;
   if(r.t && el('tlCodigo') && !el('tlCodigo').value){ el('tlCodigo').value = r.t; estrictoOk('tlCodigo'); limpiarMarca('tlCodigo'); }
   if(r.c && el('tlColor') && !el('tlColor').value){ el('tlColor').value = r.c; estrictoOk('tlColor'); limpiarMarca('tlColor'); }
+}
+function telaFormAbierto(){ return !el('pTelaForm').hidden; }
+/* Lo último registrado (las 20 telas más nuevas, en cualquier estado) queda dentro
+   de la ventana, plegado: se abre con el botón, y solo tras grabar una tela. */
+function verRecientes(abrir){
+  var c = el('telRecientes'), b = el('btnRecientes');
+  var mostrarlo = (abrir === true) ? true : (abrir === false ? false : c.hidden);
+  c.hidden = !mostrarlo;
+  b.textContent = mostrarlo ? 'Ocultar lo último registrado' : 'Ver lo último registrado';
+  b.setAttribute('aria-expanded', mostrarlo ? 'true' : 'false');
+  if(mostrarlo && abrir !== true) cargarRecientes();
+}
+function cerrarTelaForm(sinPreguntar){
+  if(!telaFormAbierto()) return;
+  if(!sinPreguntar && el('btnTela') && hayCambios(el('telFormArea')) && !window.confirm('¿Salir sin guardar?')) return;
+  el('pTelaForm').hidden = true;
+  document.body.style.overflow = '';
+  el('telFormArea').innerHTML = '';
+  cargarTelas();                                   // la lista de atrás, al día
 }
 var PART_ULT = '', PART_ENC = null;
 function buscarPartidaTela(v){
@@ -3355,6 +3484,7 @@ function guardarTelaForm(btn){
 function exitoTela(r, p){
   TELA_ULTIMA = p;
   var ids = r.ids || [r.id];
+  verRecientes(true);                               // tras grabar se ve lo último, con lo nuevo en verde
   cargarRecientes(ids);
   var cod = ids.length === 1 ? ids[0] : (ids.length === 2 ? ids[0] + ' y ' + ids[1] : ids[0] + ' a ' + ids[ids.length - 1]);
   el('telFormArea').innerHTML = '<div class="panel fcard"><span class="tira resultado"></span>'
@@ -3366,7 +3496,7 @@ function exitoTela(r, p){
     + (r.repetido ? ' (Este guardado ya se había hecho: no se volvió a grabar.)' : '') + '</div>'
     + '<div class="acciones"><button class="btn primary" type="button" onclick="otraTela()">Otra tela del mismo grupo</button>'
     + '<button class="btn" type="button" onclick="abrirTelaForm()">Otra tela</button>'
-    + '<button class="btn" type="button" onclick="abrirTelas()">Ver las telas</button></div>'
+    + '<button class="btn" type="button" onclick="cerrarTelaForm(true)">Cerrar y ver las telas</button></div>'
     + '<div class="ayuda" style="font-size:12px;color:var(--stone);margin-top:8px">Otra tela del mismo grupo deja la hora de '
     + 'llegada, el cliente, el grupo, los estilos y la modelista; cambias partida y color.</div>'
     + '</div>';
@@ -4449,7 +4579,13 @@ el('capaNombre').addEventListener('click', function(ev){
 document.addEventListener('keydown', function(ev){
   if(ev.key !== 'Escape') return;
   if(el('capaNombre').firstChild){ cerrarNombre(); return; }
+  if(!el('modal').firstChild && telaFormAbierto()){ cerrarTelaForm(); return; }
   intentarCerrar();
+});
+var _bajoVent = false;
+document.addEventListener('mousedown', function(ev){ _bajoVent = (ev.target && ev.target.id === 'telVentFondo'); });
+document.addEventListener('click', function(ev){
+  if(ev.target && ev.target.id === 'telVentFondo' && _bajoVent) cerrarTelaForm();
 });
 
 /* ================== arranque ================== */
