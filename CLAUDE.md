@@ -30,7 +30,7 @@ Fuera del portal (link sin `?usuario=`) sale el botón «Identificarme»: se esc
 - Lee además `ops` y `partidas` (listas para elegir), `cat_clientes`, `nombres_sistemas` y `cod_cliente_alias`.
 
 ## Quién la usa
-Armando Berrocal y José Palacios (completo), las modelistas, Robert Gutierrez (corte) y Lidia Candela (costura). Para dar o quitar un acceso: una fila en `encog_accesos` (con el "procede" de Christian).
+Armando Berrocal y José Palacios (completo), las modelistas, Robert Gutierrez (corte) y Lidia Candela (costura). Para dar o quitar un acceso (desde el 11/11/2026): Christian lo hace en el panel "Quién registra" (`lives-portal/admin.html`), con las cuatro opciones «Encogimiento · sistema completo / Modelista / Corte / Costura». El panel escribe en `encog_accesos`: un solo rol por persona (al dar uno se reemplaza el anterior); al apagar queda `activo = false` y la persona solo ve.
 
 ## Para Sistemas
 `encog_accesos` + `encog_rol` + `encog_puede_accion` son la pieza que reemplazan con su seguridad. En SQL Server se exige usuario para abrir y leer.
