@@ -1,0 +1,33 @@
+# CLAUDE.md — Sistema de Encogimiento
+
+Las reglas generales están en el repo `lives-instrucciones` (CLAUDE.md). Aquí solo lo propio de esta herramienta.
+
+## Qué hace
+Registra el recorrido de cada prueba de encogimiento de Desarrollo (Planta Barranco): llega la tela de producción, la modelista libera, Corte corta, Costura cose y queda entregado. Pedido de José Palacios, aprobado por la señora Yvonne. Reemplaza al Google Sheet + Apps Script.
+
+## Pantalla
+Un solo archivo: `index.html` (GitHub Pages). Un solo enlace para todos: el menú lo decide el rol de la persona, que responde la base en la acción `inicio`. `?area=corte|costura|modelista` solo le sirve a quien tiene el sistema completo, para mirar la pantalla de un área.
+
+| Rol | Qué ve y qué guarda |
+|---|---|
+| COMPLETO | Todo: Telas de producción, Ingresar encogimientos, Programa, Búsqueda (con Excel), Gráficos, Generar prueba |
+| MODELISTA | Generar prueba de encogimiento (libera o manda a residual); Seguimiento y Búsqueda solo para ver |
+| CORTE | Registrar corte; Programa solo para ver |
+| COSTURA | Registrar costura; Programa solo para ver |
+| VER (quien no está en la lista) | Programa y Búsqueda solo para ver |
+| SUPERVISION (rcamogliano) | Ve todo, la base no le guarda nada |
+
+Fuera del portal (link sin `?usuario=`) sale el botón «Identificarme»: se escribe el usuario del portal.
+
+## Base (Supabase, prefijo `encog_`)
+- Puerta única: `encog_api(p_accion, p)`. Las funciones `encog_a_*` están cerradas a la web. Las tablas no se leen directo.
+- Tablas: `encog_encogimientos`, `encog_telas`, `encog_movimientos`, `encog_prioridad`, `encog_costureras`, `encog_costura_personas`, `encog_cortadores`, `encog_modelistas`, `encog_estados`, `encog_parametros`, `encog_tokens`, `encog_accesos`.
+- Accesos (desde el 11/11/2026): `encog_accesos` (usuario de Sistemas → rol), `encog_rol`, `encog_puede`, `encog_puede_accion`. Cada guardado se valida por rol. Corte firma con su código de cortador (campo `usuario`) y manda además `quien` (usuario del portal), que es con lo que se revisa el permiso.
+- `encog_parametros.registro_libre`: `no`. Si se pone `si`, todos vuelven a poder guardar todo.
+- Lee además `ops` (código de tela), `nombres_sistemas` y `cod_cliente_alias`.
+
+## Quién la usa
+Armando Berrocal y José Palacios (completo), las modelistas, Robert Gutierrez (corte) y Lidia Candela (costura). Para dar o quitar un acceso: una fila en `encog_accesos` (con el "procede" de Christian).
+
+## Para Sistemas
+`encog_accesos` + `encog_rol` + `encog_puede_accion` son la pieza que reemplazan con su seguridad. En SQL Server se exige usuario para abrir y leer.

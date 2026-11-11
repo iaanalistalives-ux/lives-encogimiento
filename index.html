@@ -1170,11 +1170,14 @@ html.lsPoOn body>*:not(#lsPo){visibility:hidden!important}
   <!-- ======================== MENÚ DEL ÁREA ======================== -->
   <section id="pMenuArea" hidden>
     <div class="rejilla">
-      <button class="tarjeta" type="button" onclick="menuTarjeta1()"><span class="tira meta"></span>
+      <button class="tarjeta" id="mnT1" type="button" onclick="menuTarjeta1()"><span class="tira meta"></span>
         <span class="n" id="mnReg">Registrar</span></button>
       <button class="tarjeta" type="button" onclick="menuTarjeta2()"><span class="tira meta"></span>
         <span class="n" id="mnPrgN">Programa de<br>encogimiento</span>
         <span class="s" id="mnPrgS">Solo ver, sin registrar</span></button>
+      <button class="tarjeta" id="mnBus" type="button" onclick="abrirBuscar(true)" hidden><span class="tira meta"></span>
+        <span class="n">Búsqueda</span>
+        <span class="s">Solo ver, sin editar</span></button>
     </div>
   </section>
 
@@ -1343,7 +1346,7 @@ var USUARIO_LINK = '';
 
 /* Marca del archivo. No se ve en pantalla: se consulta escribiendo VERSION en
    la consola del navegador (F12 -> Consola). */
-var VERSION = 'ENC build 30oct-2';
+var VERSION = 'ENC build 11nov-1';
 
 /* Logo: lockup horizontal blanco de la skill lives-logo, en base64. Queda vacío
    porque la skill está instalada sin sus PNG; con esto vacío el header va sin
@@ -1379,6 +1382,28 @@ var BQ = { filas:[], estados:[], listos:{ rep:false, baj:false } };
 var AR = { filas:[], todas:[], prio:[], hora:'', costureras:[] };
 var TEL = { filas:[], clientes:[], porRevisar:0, residuales:0, hora:'', acc:{}, cant:{}, aviso:'', verResid:false };
 var MODELISTA = (AREA === 'modelista');      // enlace de las modelistas: solo ven las telas
+/* 11nov: el menú lo decide el ROL de la persona (lo responde la base en 'inicio'),
+   no el enlace. Todos entran por el mismo enlace. ?area= solo le sirve a quien
+   tiene el sistema completo, para mirar la pantalla de un área. */
+var AREA_LINK = AREA;
+var ROL = '';
+var SOLO_MIRA = false;        // no está en la lista de accesos: solo ve
+function aplicarRol(rol){
+  ROL = String(rol || 'VER').toUpperCase();
+  SOLO_MIRA = (ROL === 'VER');
+  if(ROL === 'MODELISTA') AREA = 'modelista';
+  else if(ROL === 'CORTE') AREA = 'corte';
+  else if(ROL === 'COSTURA') AREA = 'costura';
+  else if(SOLO_MIRA) AREA = '';
+  else AREA = (AREA_LINK === 'modelista' || AREAS[AREA_LINK]) ? AREA_LINK : '';
+  MODELISTA = (AREA === 'modelista');
+}
+function pedirRol(luego){
+  srv('inicio', undefined,
+    function(r){ aplicarRol(r && r.ok ? r.rol : 'VER'); luego(); },
+    function(e){ aplicarRol('VER'); luego();
+      alertaGeneral('No se pudo consultar tu acceso: ' + (e && e.message ? e.message : e) + '. Revisa la conexión y vuelve a abrir la pantalla.'); });
+}
 /* 30oct-2: Desarrollo tiene el botón "Generar prueba de encogimiento" (al final
    del menú): la misma pantalla de las modelistas, por si la modelista falta. */
 var COMO_MOD = false;
@@ -1898,7 +1923,7 @@ function pedirNombre(luego){
     + '<div class="fd">Tu nombre queda anotado en cada registro. Se guarda en este equipo.</div></div>'
     + '<button class="cerrar" type="button" aria-label="Cerrar" onclick="cerrarNombre()">&#10005;</button></div>'
     + '<div class="fcuerpo">'
-    + campoTexto('nmNombre', 'Nombre o iniciales', usuario, null, null, null)
+    + campoTexto('nmNombre', 'Tu usuario del portal', usuario, null, null, null)
     + '<div class="acciones"><button class="btn primary" type="button" onclick="guardarNombre()">GUARDAR</button>'
     + '<button class="btn" type="button" onclick="cerrarNombre()">Ahora no</button></div>'
     + '</div></div></div>';
@@ -1908,13 +1933,17 @@ function pedirNombre(luego){
 }
 function guardarNombre(){
   var n = val('nmNombre').replace(/\s+/g,' ').toUpperCase();
-  if(!n){ marcarCampo('nmNombre', 'Escribe tu nombre o tus iniciales.'); return; }
+  if(!n){ marcarCampo('nmNombre', 'Escribe tu usuario del portal.'); return; }
   usuario = n;
   try{ localStorage.setItem(CLAVE_NOMBRE, usuario); }catch(e){}
   verNombre();
   var luego = _luegoNombre;
   cerrarNombre();
-  if(luego) luego();
+  var antes = ROL;
+  pedirRol(function(){
+    if(luego) luego();
+    else if(ROL !== antes){ cerrarModal(); irMenu(); }
+  });
 }
 function cerrarNombre(){ el('capaNombre').innerHTML = ''; _luegoNombre = null; }
 
@@ -1931,6 +1960,8 @@ function titulo(a, b){
 function atras(ver){ el('btnAtras').hidden = !ver; }
 
 function irMenu(){
+  el('mnT1').hidden = false; el('mnBus').hidden = true;
+  if(SOLO_MIRA){ menuVer(); return; }
   if(MODELISTA){ menuModelista(); return; }
   if(AREA && AREAS[AREA]){ menuArea(); return; }
   SOLO_VER = false;
@@ -3221,10 +3252,11 @@ function otraTela(){
    Lo que se encuentra sale en tarjetas, como en el Programa; al tocar una se
    ve su ruta. Descargar Excel baja la base de datos (con la semana de cada
    entrega) más dos hojas: Dados de baja y Residuales. */
-function abrirBuscar(){
-  SOLO_VER = false;
+function abrirBuscar(soloVer){
+  SOLO_VER = !!soloVer;
   mostrar('pBuscar'); atras(true);
-  titulo('BÚSQUEDA DE ENCOGIMIENTOS', 'Búsqueda de todo · descarga de la base de datos');
+  titulo('BÚSQUEDA DE ENCOGIMIENTOS', SOLO_VER ? 'Búsqueda de todo · solo para ver' : 'Búsqueda de todo · descarga de la base de datos');
+  el('bqExcel').hidden = SOLO_VER;
   el('bqTexto').value = '';
   el('bqEstado').innerHTML = '';
   el('bqVigentes').checked = true;
@@ -3677,6 +3709,17 @@ function menuModelista(){
   el('mnReg').innerHTML = 'Generar prueba de<br>encogimiento';            // 09oct-2: antes "Telas de producción"
   el('mnPrgN').innerHTML = 'Seguimiento de<br>encogimiento';
   el('mnPrgS').textContent = 'Solo ver, sin editar';
+  el('mnBus').hidden = false;                  // 11nov: búsqueda solo para ver
+}
+/* Quien no está en la lista de accesos: mira el programa y la búsqueda, sin registrar. */
+function menuVer(){
+  SOLO_VER = true;
+  mostrar('pMenuArea'); atras(false);
+  titulo('ENCOGIMIENTO', 'Planta Barranco');
+  el('mnT1').hidden = true;
+  el('mnPrgN').innerHTML = 'Programa de<br>encogimiento';
+  el('mnPrgS').textContent = 'Solo ver, sin registrar';
+  el('mnBus').hidden = false;
 }
 function menuTarjeta1(){ if(MODELISTA) abrirTelas(); else abrirArea(); }
 function menuTarjeta2(){ if(MODELISTA) abrirSeguimiento(); else abrirPrograma(true); }
@@ -3690,6 +3733,8 @@ function menuArea(){
   SOLO_VER = false;
   mostrar('pMenuArea'); atras(false);
   titulo('ENCOGIMIENTO · ' + a.nombre, 'Planta Barranco');
+  el('mnPrgN').innerHTML = 'Programa de<br>encogimiento';
+  el('mnPrgS').textContent = 'Solo ver, sin registrar';
   el('mnReg').innerHTML = a.menuHtml;              // como el WIP: solo el título, en dos líneas
 }
 
@@ -3807,6 +3852,7 @@ function guardarArea(btn, id){
 
   function enviar(){
     p.usuario = (AREA === 'corte') ? p.cortador : usuario;
+    p.quien = usuario || USUARIO_LINK || '';     // 11nov: el permiso se revisa con el usuario, no con el código de cortador
     p.token = tokenPara(btn, p);
     btn.disabled = true; btn.textContent = 'Registrando...';
     var w = conEspera(btn, a.boton, 'arModalMsg',
@@ -3828,7 +3874,7 @@ function guardarArea(btn, id){
       function(e){ btn.disabled = false; btn.textContent = a.boton; msg.innerHTML = nota('error', sinConexion(e)); });
     srv('registrar', p, w.ok, w.mal);
   }
-  if(AREA === 'corte') enviar(); else conNombre(enviar);
+  conNombre(enviar);
 }
 
 /* ================== FICHA (Desarrollo; las áreas la ven solo para mirar) ================== */
@@ -4271,27 +4317,7 @@ document.addEventListener('keydown', function(ev){
 (function(){
   if(EMBEBIDO) document.body.classList.add('embebido');
   if(LOGO){ el('logo').src = LOGO; el('logo').hidden = false; el('divLogo').hidden = false; }
-  if(MODELISTA){
-    // las modelistas no registran telas, pero sí liberan: el nombre se pide al liberar
-    var t1m;
-    el('telTexto').addEventListener('input', function(){ clearTimeout(t1m); t1m = setTimeout(pintarTelas, 200); });
-    var t2m;
-    el('prgTexto').addEventListener('input', function(){ clearTimeout(t2m); t2m = setTimeout(pintarPrograma, 200); });
-    irMenu();
-    return;
-  }
-  if(AREA && !AREAS[AREA]){
-    // un enlace viejo o mal escrito no abre el menú completo de Desarrollo
-    titulo('ENCOGIMIENTO', 'Planta Barranco');
-    el('yo').hidden = true;
-    el('pAviso').hidden = false;
-    el('avisoTxt').innerHTML = nota('aviso', '<b>Este enlace no es válido.</b> Trae ?area=' + esc(AREA)
-      + ', que no existe en el sistema de encogimiento. Las áreas son <b>corte</b>, <b>costura</b> y <b>modelista</b>. '
-      + 'Pide el enlace correcto a Desarrollo.');
-    return;
-  }
   cargarNombre();
-  if(AREA === 'corte' || USUARIO_LINK) el('yo').hidden = true;      // corte firma con su código de cortador
   var t1, t2, t3;
   el('prgTexto').addEventListener('input', function(){ clearTimeout(t1); t1 = setTimeout(function(){ PRG.tope = PRG_TOPE; pintarPrograma(); }, 200); });
   el('bqTexto').addEventListener('input', function(){ clearTimeout(t2); t2 = setTimeout(pintarBQ, 200); });
@@ -4302,7 +4328,7 @@ document.addEventListener('keydown', function(ev){
     var b = e.target.closest('button[data-a]');
     if(b){ GR.anio = b.getAttribute('data-a'); pintarGraficos(); }
   });
-  irMenu();
+  pedirRol(irMenu);
 })();
 </script>
 <!-- ===== lives-franja v6.2 (2026-10-27: pestañas ya no se meten en la barra al bajar y subir) · v6.1 · 2026-10-09 · sin franja de estado arriba y sin la palabra "Supabase" (común a todas las herramientas).
