@@ -1346,7 +1346,7 @@ var USUARIO_LINK = '';
 
 /* Marca del archivo. No se ve en pantalla: se consulta escribiendo VERSION en
    la consola del navegador (F12 -> Consola). */
-var VERSION = 'ENC build 11nov-1';
+var VERSION = 'ENC build 11nov-2';
 
 /* Logo: lockup horizontal blanco de la skill lives-logo, en base64. Queda vacío
    porque la skill está instalada sin sus PNG; con esto vacío el header va sin
@@ -1625,6 +1625,93 @@ document.addEventListener('keydown', function(e){
   x.dispatchEvent(new Event('change', { bubbles:true }));
 }, true);
 
+/* 11nov-2 · SELECCIÓN DESDE LA BASE. Los datos que existen en la base de OPs o
+   de Partidas (y, si no están ahí, en lo ya registrado) se ELIGEN de la lista:
+   no se escriben. campoElegir() es un campoTexto que solo acepta un valor de su
+   lista; lo que no coincide se borra y se avisa. */
+var CAT = null;               // { grupos:[{g,cli,e,c,t}], partidas:[{p,t,c,g}] }
+function conCatalogo(luego){
+  if(CAT){ luego(); return; }
+  srv('getCatalogo', undefined,
+    function(r){ CAT = (r && r.ok) ? r : { grupos:[], partidas:[], falla:true }; luego(); },
+    function(){ CAT = { grupos:[], partidas:[], falla:true }; luego(); });
+}
+function unicos(a){ var v = {}, o = []; for(var i=0;i<a.length;i++){ var x = a[i]; if(x && !v[x]){ v[x] = 1; o.push(x); } } return o; }
+function catGrupo(g){
+  g = norm(g);
+  var L = (CAT && CAT.grupos) || [];
+  for(var i=0;i<L.length;i++) if(L[i].g === g) return L[i];
+  return null;
+}
+function catGrupos(cliente){
+  var L = (CAT && CAT.grupos) || [], c = norm(cliente), o = [];
+  for(var i=0;i<L.length;i++) if(!c || norm(L[i].cli) === c) o.push(L[i].g);
+  return o;
+}
+function catClientes(){
+  var L = (CAT && CAT.grupos) || [], o = ((OPC && OPC.clientes) || []).slice();
+  for(var i=0;i<L.length;i++) if(L[i].cli) o.push(L[i].cli);
+  return unicos(o);
+}
+// lo del grupo va primero; después lo demás de la base (por si la OP no trae ese dato en ese grupo)
+function catDe(k, grupo, todo){
+  var L = (CAT && CAT.grupos) || [], G = catGrupo(grupo), o = G ? G[k].slice() : [];
+  if(k === 'e' && G && !todo) return o;                    // estilos: solo los del grupo
+  for(var i=0;i<L.length;i++) o = o.concat(L[i][k]);
+  if(k === 't' || k === 'c'){ var P = (CAT && CAT.partidas) || []; for(var j=0;j<P.length;j++) o.push(k === 't' ? P[j].t : P[j].c); }
+  return unicos(o);
+}
+function catPartidas(grupo){
+  var P = (CAT && CAT.partidas) || [], g = norm(grupo), a = [], b = [];
+  for(var i=0;i<P.length;i++){ if(g && P[i].g === g) a.push(P[i].p); else b.push(P[i].p); }
+  return unicos(a.concat(b));
+}
+// la partida, con su tela y su color si en la base tiene uno solo
+function catPartida(p){
+  var P = (CAT && CAT.partidas) || [], n = norm(p), r = null;
+  for(var i=0;i<P.length;i++) if(P[i].p === n){
+    if(!r) r = { p:n, t:P[i].t, c:P[i].c, g:P[i].g };
+    else { if(r.t !== P[i].t) r.t = ''; if(r.c !== P[i].c) r.c = ''; if(r.g !== P[i].g) r.g = ''; }
+  }
+  return r;
+}
+function ponerLista(idLista, valores){
+  var dl = el(idLista), x = '';
+  if(!dl) return;
+  for(var i=0;i<(valores || []).length;i++) x += '<option value="' + esc(valores[i]) + '">';
+  dl.innerHTML = x;
+}
+function campoElegir(id, etiqueta, valor, idLista, valores, ayuda, tela){
+  return campoTexto(id, etiqueta, valor, idLista, valores, null, ayuda)
+    .replace('<input id="' + id + '"', '<input id="' + id + '" data-estricto="1"' + (tela ? ' data-tela="1"' : '') + ' placeholder="Elige de la lista"');
+}
+/* ¿Lo que hay en el campo está en su lista? Si es el comienzo de una sola opción,
+   la completa. El código de tela corto (JE2052) se busca también como JE002052. */
+function estrictoOk(id){
+  var e = el(id);
+  if(!e || !e.list) return true;
+  var t = norm(e.value);
+  if(!t){ e.value = ''; return true; }
+  var ops = e.list.options, hay = null, empiezan = [];
+  if(!ops.length) return true;                    // sin lista no se puede exigir (lo revisa la base al guardar)
+  var alt = '';
+  if(e.getAttribute('data-tela')){ var m = t.replace(/[^A-Z0-9]/g, '').match(/^([A-Z]+)(\d+)$/); if(m) alt = m[1] + ('000000' + m[2]).slice(-6); }
+  for(var i=0;i<ops.length;i++){
+    var o = norm(ops[i].value);
+    if(o === t || (alt && o === alt)){ hay = ops[i].value; break; }
+    if(o.indexOf(t) === 0) empiezan.push(ops[i].value);
+  }
+  if(!hay && empiezan.length === 1) hay = empiezan[0];
+  if(hay){ e.value = hay; limpiarMarca(id); return true; }
+  marcarCampo(id, '"' + e.value.trim() + '" no está en la base de datos. Elige de la lista.');
+  e.value = '';
+  return false;
+}
+document.addEventListener('change', function(ev){
+  var x = ev.target;
+  if(x && x.tagName === 'INPUT' && x.getAttribute('data-estricto')) estrictoOk(x.id);
+}, true);
+
 function campoTexto(id, etiqueta, valor, idLista, valores, ejemplo, ayuda, mayus){
   return '<div class="campo"><label for="' + id + '">' + esc(etiqueta) + '</label>'
     + '<input id="' + id + '" value="' + esc(valor || '') + '" autocomplete="off"'
@@ -1745,7 +1832,7 @@ function persEntrada(id){
     var partes = e.value.split(/[,;\n]+/), ultimo = partes.pop();
     for(var i=0;i<partes.length;i++){
       var t = partes[i].replace(/\s+/g,' ').trim().toUpperCase();
-      if(t) persMeter(P, id, t);
+      if(t) persMeterLista(P, id, t);
     }
     e.value = ultimo.replace(/^\s+/, '');
     persPintar(id);
@@ -1760,7 +1847,7 @@ function persPegar(id){
     var partes = e.value.split(/[,;\n]+/), cambio = false;
     for(var i=0;i<partes.length;i++){
       var t = partes[i].replace(/\s+/g,' ').trim().toUpperCase();
-      if(t && persMeter(P, id, t)) cambio = true;
+      if(t && persMeterLista(P, id, t)) cambio = true;
     }
     e.value = '';
     if(cambio) persPintar(id);
@@ -1777,6 +1864,14 @@ function persTipeo(id, desdeFoco){
     if(persIndice(P.sel, x) >= 0) continue;               // ya está puesta
     if(t && norm(x).indexOf(t) < 0) continue;
     P.opc.push({ n:x, nueva:false });
+  }
+  // la coincidencia exacta va primera, aunque la lista se corte en 30 (11nov-2)
+  if(t){
+    var kx = persIndice(P.lista, e.value);
+    if(kx >= 0 && persIndice(P.sel, P.lista[kx]) < 0){
+      P.opc = P.opc.filter(function(o){ return norm(o.n) !== t; });
+      P.opc.unshift({ n:P.lista[kx], nueva:false });
+    }
   }
   var tx = e.value.replace(/\s+/g,' ').trim();
   if(P.libre && tx.length >= (P.cfg.min || 2) && persIndice(P.lista, tx) < 0 && persIndice(P.sel, tx) < 0)
@@ -1821,6 +1916,13 @@ function persMeter(P, id, t){
   P.sel.push(t);
   if(P.cfg.alAgregar) setTimeout(function(){ P.cfg.alAgregar(t); }, 0);
   return true;
+}
+// con lista cerrada solo entra lo que está en la lista (11nov-2)
+function persMeterLista(P, id, t){
+  if(P.libre) return persMeter(P, id, t);
+  var k = persIndice(P.lista, t);
+  if(k < 0){ marcarCampo(id, '"' + t + '" no está en la base de datos. Elige de la lista.'); P.topeAviso = true; return false; }
+  return persMeter(P, id, P.lista[k]);
 }
 function persAgregar(id, nombre){
   var P = PERSONAS[id], e = el('pi_' + id);
@@ -2095,7 +2197,7 @@ function exitoPegado(r){
   el('preview').innerHTML = h;
   el('pegado').value = '';
   PEG = null;
-  OPC = null;
+  OPC = null; CAT = null;
   window.scrollTo(0, 0);
 }
 
@@ -2915,27 +3017,34 @@ function editarTelaForm(){
         function(){ OPC = { clientes:[], modelistas:[], grupos:{} }; editarTelaForm(); });
     return;
   }
+  if(!CAT){ el('telCuerpo').innerHTML = cargando('Preparando...'); conCatalogo(editarTelaForm); return; }
   var f = TELA_VISTA;
   el('telCuerpo').innerHTML = '<div class="rot">Editar la tela</div><div id="etMsg"></div>'
     + nota('', 'Se puede editar mientras la modelista no la libere. Cada cambio queda anotado.')
     + campoFechaHora('etLlegada', 'Fecha y hora de llegada *', f.llegada)
-    + campoTexto('etCliente', 'Cliente *', f.cliente, 'lECli', OPC.clientes || [])
-    + campoTexto('etModelista', 'Modelista', f.modelista, 'lEMod', OPC.modelistas || [])
-    + campoTexto('etGrupo', 'Grupo *', f.grupo, 'lEGru', gruposDe(f.cliente))
-    + campoTexto('etCodigo', 'Código de tela', f.codigo)
-    + campoTexto('etEstilo', 'Estilo *', f.estilo)
-    + campoTexto('etPartida', 'Partida *', f.partida)
-    + campoTexto('etColor', 'Color *', f.color)
+    + campoElegir('etCliente', 'Cliente *', f.cliente, 'lECli', catClientes())
+    + campoElegir('etModelista', 'Modelista', f.modelista, 'lEMod', OPC.modelistas || [])
+    + campoElegir('etGrupo', 'Grupo *', f.grupo, 'lEGru', catGrupos(f.cliente))
+    + campoElegir('etCodigo', 'Código de tela', f.codigo, 'lECod', catDe('t', f.grupo), null, true)
+    + campoElegir('etEstilo', 'Estilo *', f.estilo, 'lEEst', catDe('e', f.grupo, true))
+    + campoElegir('etPartida', 'Partida *', f.partida, 'lEPar', catPartidas(f.grupo))
+    + campoElegir('etColor', 'Color *', f.color, 'lECol', catDe('c', f.grupo))
     + campoArea('etObs', 'Observaciones', f.obs, 'Opcional: algo que haya que avisar')
     + '<div class="acciones"><button class="btn primary" type="button" onclick="guardarTelaEdit(this)">GUARDAR CAMBIOS</button>'
     + '<button class="btn" type="button" onclick="verTelaObj(TELA_VISTA)">Volver</button></div>';
+  el('etCliente').addEventListener('change', function(){ ponerLista('lEGru', catGrupos(this.value)); });
+  el('etGrupo').addEventListener('change', function(){
+    ponerLista('lECod', catDe('t', this.value)); ponerLista('lEEst', catDe('e', this.value, true));
+    ponerLista('lEPar', catPartidas(this.value)); ponerLista('lECol', catDe('c', this.value));
+  });
 }
 function guardarTelaEdit(btn){
   var ok = true, p = { id:TELA_VISTA.id };
   for(var k in CAMPOS_ET) limpiarMarca(CAMPOS_ET[k]);
   var ll = fechaHoraDe('etLlegada'); if(ll === null) ok = false; p.llegada = ll || '';
-  var obl = { cliente:'Escribe el cliente.', grupo:'Escribe el grupo.', estilo:'Escribe el estilo.', partida:'Escribe la partida.', color:'Escribe el color.' };
+  var obl = { cliente:'Elige el cliente.', grupo:'Elige el grupo.', estilo:'Elige el estilo.', partida:'Elige la partida.', color:'Elige el color.' };
   ['cliente','modelista','grupo','codigo','estilo','partida','color'].forEach(function(c){
+    if(norm(val(CAMPOS_ET[c])) !== norm(TELA_VISTA[c]) && !estrictoOk(CAMPOS_ET[c])){ ok = false; return; }   // lo que no se toca no se revisa
     p[c] = val(CAMPOS_ET[c]).replace(/\s+/g,' ').toUpperCase();
     if(obl[c] && !p[c]){ marcarCampo(CAMPOS_ET[c], obl[c]); ok = false; }
   });
@@ -3087,12 +3196,12 @@ function abrirTelaForm(pre){
   mostrar('pTelaForm'); atras(true);
   titulo('LLEGADA DE TELA DE PRODUCCIÓN', 'Una hoja blanca por tela');
   cargarRecientes();
-  if(OPC){ pintarTelaForm(pre); return; }
+  if(OPC && CAT){ pintarTelaForm(pre); return; }
   el('telFormArea').innerHTML = cargando('Preparando el formulario...');
   srv('getOpciones', undefined, function(r){
     OPC = (r && r.ok) ? r : { clientes:[], servicios:[], modelistas:[], grupos:{} };
-    pintarTelaForm(pre);
-  }, function(){ OPC = { clientes:[], servicios:[], modelistas:[], grupos:{} }; pintarTelaForm(pre); });
+    conCatalogo(function(){ pintarTelaForm(pre); });
+  }, function(){ OPC = { clientes:[], servicios:[], modelistas:[], grupos:{} }; conCatalogo(function(){ pintarTelaForm(pre); }); });
 }
 function pintarTelaForm(pre){
   pre = pre || {};
@@ -3102,30 +3211,31 @@ function pintarTelaForm(pre){
     + '<div class="ph">Se copia de la hoja blanca que llega con la tela (ENCOGIMIENTO DESARROLLO). Los campos con * son '
     + 'obligatorios; lo demás se llena si la hoja lo trae. Al grabar, las modelistas la ven en su pantalla.</div>'
     + '<div id="telFormMsg"></div>'
+    + (CAT && CAT.falla ? nota('error', 'No se pudieron cargar las listas de la base de datos. Revisa la conexión y vuelve a abrir el formulario.') : '')
     + '<div class="sec">Llegada</div>'
     + campoFechaHora('tlLlegada', 'Fecha y hora de llegada *', pre.llegada || ahoraDMAHM(), 'Cuándo llegó la tela a la planta.')
-    + campoTexto('tlCliente', 'Cliente *', pre.cliente, 'lTCli', o.clientes, 'THEORY')
-    + campoTexto('tlModelista', 'Modelista', pre.modelista, 'lTMod', o.modelistas, 'ROSARIO FRISANCHO',
+    + campoElegir('tlCliente', 'Cliente *', pre.cliente, 'lTCli', catClientes())
+    + campoElegir('tlModelista', 'Modelista', pre.modelista, 'lTMod', o.modelistas,
         'Quién la va a revisar, si ya se sabe. Escribe el comienzo del nombre y presiona Tab.')
     + '<div class="sec">De la hoja blanca</div>'
-    + campoTexto('tlGrupo', 'Grupo *', pre.grupo, 'lTGru', gruposDe(pre.cliente), 'THY-1120')
-    + campoTexto('tlCodigo', 'Código de tela *', pre.codigo, null, null, 'JE2052')
-    + campoPersonas('tlEstilo', 'Estilos *', o.estilos || [], pre.estilo, true,
-        'Pon todos los estilos de la hoja: escribe uno y presiona Enter (o coma). Al grabar se crea una fila por estilo, con la misma tela. '
+    + campoElegir('tlGrupo', 'Grupo *', pre.grupo, 'lTGru', catGrupos(pre.cliente))
+    + campoElegir('tlCodigo', 'Código de tela *', pre.codigo, 'lTCod', catDe('t', pre.grupo), null, true)
+    + campoPersonas('tlEstilo', 'Estilos *', catDe('e', pre.grupo), pre.estilo, false,
+        'Elige todos los estilos de la hoja: escribe el comienzo y elige de la lista. Al grabar se crea una fila por estilo, con la misma tela. '
         + 'Si hay varias partidas, va un solo estilo.',
-        { nuevo:'Agregar el estilo {n}', min:1, separar:true, exacto:true, sinAviso:true, placeholder:'Escribe el estilo y presiona Enter',
+        { min:1, separar:true, sinAviso:true, placeholder:'Elige el estilo de la lista',
           limite:function(){ return (PERSONAS.tlPartida && PERSONAS.tlPartida.sel.length >= 2) ? 1 : 99; },
           msgLimite:'Ya hay varias partidas: con varias partidas va un solo estilo (no se mezclan).' })
-    + campoPersonas('tlPartida', 'Partidas *', [], pre.partida, true,
-        'La partida de la hoja. Si un mismo estilo llega en varias partidas, ponlas todas (Enter o coma): se crea una fila por partida, '
+    + campoPersonas('tlPartida', 'Partidas *', catPartidas(pre.grupo), pre.partida, false,
+        'La partida de la hoja, elegida de la lista. Si un mismo estilo llega en varias partidas, ponlas todas: se crea una fila por partida, '
         + 'con el mismo estilo. Si hay varios estilos, va una sola partida.',
-        { nuevo:'Agregar la partida {n}', min:1, separar:true, exacto:true, sinAviso:true, placeholder:'Escribe la partida y presiona Enter',
+        { min:1, separar:true, sinAviso:true, placeholder:'Elige la partida de la lista',
           limite:function(){ return (PERSONAS.tlEstilo && PERSONAS.tlEstilo.sel.length >= 2) ? 1 : 99; },
           msgLimite:'Ya hay varios estilos: con varios estilos va una sola partida (no se mezclan).',
-          alAgregar:function(t){ buscarPartidaTela(t); },
+          alAgregar:function(t){ llenarDePartida(t); buscarPartidaTela(t); },
           alQuitar:function(t){ if(PART_ENC && t === PART_ULT){ el('tlPartidaAviso').innerHTML = ''; PART_ENC = null; PART_ULT = ''; } } })
     + '<div id="tlPartidaAviso" aria-live="polite"></div>'
-    + campoTexto('tlColor', 'Color *', pre.color, null, null, '111438-WHITE (RES)')
+    + campoElegir('tlColor', 'Color *', pre.color, 'lTCol', catDe('c', pre.grupo))
     + '<div class="sec">Otros</div>'
     + campoArea('tlObs', 'Observaciones', pre.obs, 'Opcional: algo que haya que avisar')
     + '<div class="acciones"><button class="btn primary" id="btnTela" type="button" onclick="guardarTelaForm(this)">REGISTRAR TELA</button>'
@@ -3134,13 +3244,32 @@ function pintarTelaForm(pre){
   el('telFormArea').innerHTML = h;
   persPintarTodos();
   el('tlCliente').addEventListener('change', function(){
-    var dl = el('lTGru'), g = gruposDe(this.value), x = '';
-    for(var i=0;i<g.length;i++) x += '<option value="' + esc(g[i]) + '">';
-    if(dl) dl.innerHTML = x;
+    var gs = catGrupos(this.value);
+    ponerLista('lTGru', gs);
+    if(el('tlGrupo').value && gs.indexOf(norm(el('tlGrupo').value)) < 0){ el('tlGrupo').value = ''; listasDelGrupo(''); }
+  });
+  el('tlGrupo').addEventListener('change', function(){
+    var G = catGrupo(this.value);
+    if(G && G.cli && !el('tlCliente').value){ el('tlCliente').value = G.cli; limpiarMarca('tlCliente'); ponerLista('lTGru', catGrupos(G.cli)); }
+    listasDelGrupo(this.value);
   });
   // si una partida que se agrega ya existe, se ofrece copiar los datos de esa tela
   PART_ULT = ''; PART_ENC = null;
   el(pre.grupo ? 'pi_tlPartida' : 'tlCliente').focus();
+}
+// al cambiar el grupo, las listas de estilo, tela, partida y color pasan a ser las de ese grupo
+function listasDelGrupo(g){
+  ponerLista('lTCod', catDe('t', g));
+  ponerLista('lTCol', catDe('c', g));
+  if(PERSONAS.tlEstilo){ PERSONAS.tlEstilo.lista = catDe('e', g); PERSONAS.tlEstilo.libre = !PERSONAS.tlEstilo.lista.length; }
+  if(PERSONAS.tlPartida){ PERSONAS.tlPartida.lista = catPartidas(g); PERSONAS.tlPartida.libre = !PERSONAS.tlPartida.lista.length; }
+}
+// la partida elegida trae su código de tela y su color (si en la base tiene uno solo)
+function llenarDePartida(p){
+  var r = catPartida(p);
+  if(!r) return;
+  if(r.t && el('tlCodigo') && !el('tlCodigo').value){ el('tlCodigo').value = r.t; estrictoOk('tlCodigo'); limpiarMarca('tlCodigo'); }
+  if(r.c && el('tlColor') && !el('tlColor').value){ el('tlColor').value = r.c; estrictoOk('tlColor'); limpiarMarca('tlColor'); }
 }
 var PART_ULT = '', PART_ENC = null;
 function buscarPartidaTela(v){
@@ -3169,6 +3298,7 @@ function usarPartida(){
   el('tlColor').value = e.color || '';
   el('tlObs').value = e.obs || '';
   ['tlLlegada','tlCliente','tlModelista','tlGrupo','tlCodigo','tlColor','tlObs'].forEach(limpiarMarca);
+  ponerLista('lTGru', catGrupos(e.cliente)); listasDelGrupo(e.grupo);
   el('tlPartidaAviso').innerHTML = nota('bien', 'Se copiaron los datos de la tela. Solo pon el estilo nuevo'
     + (e.estilos && e.estilos.length ? ' (ya tiene ' + esc(e.estilos.join(', ')) + ')' : '') + ' y graba.');
   var pe = el('pi_tlEstilo');
@@ -3178,21 +3308,22 @@ function leerTelaForm(){
   var ok = true, p = {};
   for(var k in CAMPOS_TELA) limpiarMarca(CAMPOS_TELA[k]);
   var ll = fechaHoraDe('tlLlegada'); if(ll === null) ok = false; p.llegada = ll || '';
-  var obl = { cliente:'Escribe el cliente.', grupo:'Escribe el grupo.', codigo:'Escribe el código de tela.', color:'Escribe el color.' };
-  var textos = ['cliente','grupo','codigo','color','modelista'];
+  var obl = { cliente:'Elige el cliente.', grupo:'Elige el grupo.', codigo:'Elige el código de tela.', color:'Elige el color.' };
+  var textos = ['cliente','grupo','codigo','color','modelista'], malos = {};
+  for(var q=0;q<textos.length;q++) if(!estrictoOk(CAMPOS_TELA[textos[q]])){ ok = false; malos[textos[q]] = 1; }
   if(persCerrar('tlEstilo')) ok = false;                 // lo que quedó escrito entra como estilo
   p.estilo = persTexto('tlEstilo');
-  if(!p.estilo){ marcarCampo('tlEstilo', 'Pon al menos un estilo.'); ok = false; }
+  if(!p.estilo){ if(!el('pb_tlEstilo').classList.contains('mal')) marcarCampo('tlEstilo', 'Elige al menos un estilo.'); ok = false; }
   if(persCerrar('tlPartida')) ok = false;                // lo mismo con la partida
   p.partida = persTexto('tlPartida');
-  if(!p.partida){ marcarCampo('tlPartida', 'Pon la partida.'); ok = false; }
+  if(!p.partida){ if(!el('pb_tlPartida').classList.contains('mal')) marcarCampo('tlPartida', 'Elige la partida.'); ok = false; }
   else if(PERSONAS.tlEstilo.sel.length > 1 && PERSONAS.tlPartida.sel.length > 1){
     marcarCampo('tlPartida', 'Varios estilos con varias partidas confunde: deja varios estilos con una partida, o un estilo con varias partidas.');
     ok = false;
   }
   for(var t=0;t<textos.length;t++){
     p[textos[t]] = val(CAMPOS_TELA[textos[t]]).replace(/\s+/g,' ').toUpperCase();
-    if(obl[textos[t]] && !p[textos[t]]){ marcarCampo(CAMPOS_TELA[textos[t]], obl[textos[t]]); ok = false; }
+    if(obl[textos[t]] && !p[textos[t]] && !malos[textos[t]]){ marcarCampo(CAMPOS_TELA[textos[t]], obl[textos[t]]); ok = false; }
   }
   p.obs = val('tlObs');
   if(!ok){ enfocarPrimerError(el('telFormArea')); return null; }
@@ -3239,7 +3370,7 @@ function exitoTela(r, p){
     + '<div class="ayuda" style="font-size:12px;color:var(--stone);margin-top:8px">Otra tela del mismo grupo deja la hora de '
     + 'llegada, el cliente, el grupo, los estilos y la modelista; cambias partida y color.</div>'
     + '</div>';
-  OPC = null;
+  OPC = null; CAT = null;
   window.scrollTo(0, 0);
 }
 function otraTela(){
@@ -4204,6 +4335,7 @@ function panelEditar(){
       function(){ OPC = { clientes:[], servicios:[], modelistas:[], grupos:{} }; panelEditar(); });
     return;
   }
+  if(!CAT){ el('fichaCuerpo').innerHTML = cargando('Preparando...'); conCatalogo(panelEditar); return; }
   var d = FICHA;
   var h = '<div class="rot">Corregir datos</div><div id="ediMsg"></div>'
         + '<div class="ayuda" style="font-size:12.5px;color:var(--stone)">Cada cambio queda en MOVIMIENTOS con lo que decía antes. '
@@ -4214,8 +4346,13 @@ function panelEditar(){
     else if(x.tipo === 'fechahora') h += campoFechaHora(id, et, x.valor);
     else if(x.tipo === 'entero')    h += campoNumero(id, et, x.valor);
     else if(x.tipo === 'libre')     h += campoArea(id, et, x.valor);
-    else if(x.campo === 'GRUPO')    h += campoTexto(id, et, x.valor, 'lEdGru', gruposDe(d.cliente));
-    else if(LISTA_EDI[x.campo])     h += campoTexto(id, et, x.valor, 'lEd' + i, OPC[LISTA_EDI[x.campo]]);
+    else if(x.campo === 'GRUPO')    h += campoElegir(id, et, x.valor, 'lEdGru', catGrupos(d.cliente));
+    else if(x.campo === 'CLIENTE')  h += campoElegir(id, et, x.valor, 'lEd' + i, catClientes());
+    else if(x.campo === 'ESTILO')   h += campoElegir(id, et, x.valor, 'lEd' + i, catDe('e', d.grupo, true));
+    else if(x.campo === 'CODIGO TELA') h += campoElegir(id, et, x.valor, 'lEd' + i, catDe('t', d.grupo), null, true);
+    else if(x.campo === 'PARTIDA')  h += campoElegir(id, et, x.valor, 'lEd' + i, catPartidas(d.grupo));
+    else if(x.campo === 'COLOR')    h += campoElegir(id, et, x.valor, 'lEd' + i, catDe('c', d.grupo));
+    else if(LISTA_EDI[x.campo])     h += campoElegir(id, et, x.valor, 'lEd' + i, OPC[LISTA_EDI[x.campo]]);
     else                            h += campoTexto(id, et, x.valor);
   }
   h += campoArea('edMotivo', 'Motivo del cambio', '', 'opcional: por qué se corrige')
@@ -4227,9 +4364,11 @@ function panelEditar(){
 function guardarEdi(btn){
   var d = FICHA, cambios = [], ok = true, idx = {};
   for(var i=0;i<d.editables.length;i++){
-    var x = d.editables[i], id = 'ed' + i, v = val(id);
+    var x = d.editables[i], id = 'ed' + i;
     idx[x.campo] = id;
     limpiarMarca(id);
+    if(el(id) && el(id).getAttribute('data-estricto') && norm(el(id).value) !== norm(x.valor) && !estrictoOk(id)){ ok = false; continue; }   // lo que no se toca no se revisa
+    var v = val(id);
     if(x.tipo === 'fecha' && v){ if(fechaDe(id) === null){ ok = false; continue; } }
     if(x.tipo === 'fechahora' && v){ if(fechaHoraDe(id) === null){ ok = false; continue; } }
     if(x.tipo === 'entero' && v !== '' && !/^\d+$/.test(v)){ marcarCampo(id, 'Escribe un número entero.'); ok = false; continue; }
@@ -4252,7 +4391,7 @@ function guardarEdi(btn){
           enfocarPrimerError(el('fichaCuerpo'));
           return;
         }
-        OPC = null;
+        OPC = null; CAT = null;
         recargarFicha(r.msg + (r.hechos && r.hechos.length ? ' ' + r.hechos.join(' · ') : ''));
       },
       function(e){ btn.disabled = false; btn.textContent = 'GUARDAR CAMBIOS'; el('ediMsg').innerHTML = nota('error', sinConexion(e)); });

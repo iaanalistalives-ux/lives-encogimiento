@@ -23,8 +23,9 @@ Fuera del portal (link sin `?usuario=`) sale el botón «Identificarme»: se esc
 - Puerta única: `encog_api(p_accion, p)`. Las funciones `encog_a_*` están cerradas a la web. Las tablas no se leen directo.
 - Tablas: `encog_encogimientos`, `encog_telas`, `encog_movimientos`, `encog_prioridad`, `encog_costureras`, `encog_costura_personas`, `encog_cortadores`, `encog_modelistas`, `encog_estados`, `encog_parametros`, `encog_tokens`, `encog_accesos`.
 - Accesos (desde el 11/11/2026): `encog_accesos` (usuario de Sistemas → rol), `encog_rol`, `encog_puede`, `encog_puede_accion`. Cada guardado se valida por rol. Corte firma con su código de cortador (campo `usuario`) y manda además `quien` (usuario del portal), que es con lo que se revisa el permiso.
+- Selección desde la base (desde el 11/11/2026): en Llegada de tela, Editar tela y Editar datos, cliente, grupo, código de tela, estilo, partida y color se ELIGEN de la lista (acción `getCatalogo`: `ops` + `partidas` + lo ya registrado); no se escriben. `encog_api` lo valida al guardar (`encog_valida_base`, `encog_en_base`). Al editar, lo que no se toca no se revisa. «Ingresar encogimientos» (pegar del Excel) no se valida.
 - `encog_parametros.registro_libre`: `no`. Si se pone `si`, todos vuelven a poder guardar todo.
-- Lee además `ops` (código de tela), `nombres_sistemas` y `cod_cliente_alias`.
+- Lee además `ops` y `partidas` (listas para elegir), `cat_clientes`, `nombres_sistemas` y `cod_cliente_alias`.
 
 ## Quién la usa
 Armando Berrocal y José Palacios (completo), las modelistas, Robert Gutierrez (corte) y Lidia Candela (costura). Para dar o quitar un acceso: una fila en `encog_accesos` (con el "procede" de Christian).
