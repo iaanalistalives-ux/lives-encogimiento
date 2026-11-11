@@ -1390,7 +1390,7 @@ var USUARIO_LINK = '';
 
 /* Marca del archivo. No se ve en pantalla: se consulta escribiendo VERSION en
    la consola del navegador (F12 -> Consola). */
-var VERSION = 'ENC build 11nov-3';
+var VERSION = 'ENC build 11nov-4';
 
 /* Logo: lockup horizontal blanco de la skill lives-logo, en base64. Queda vacío
    porque la skill está instalada sin sus PNG; con esto vacío el header va sin
@@ -1402,7 +1402,12 @@ var LOGO = '';
 var MODO_PRUEBA = false;
 if (/^<\?/.test(AREA)) {
   var qs = {};
-  location.search.replace(/[?&]([^=&]+)=?([^&]*)/g, function(_, k, v){ qs[k] = decodeURIComponent(v); });
+  /* 11nov-4: en un enlace el espacio puede llegar como "+" (así lo deja el portal y el bloque de sesión).
+     Sin esto el nombre llegaba como "NOMBRE+APELLIDO", la base no lo reconocía y daba solo ver. */
+  location.search.replace(/[?&]([^=&]+)=?([^&]*)/g, function(_, k, v){
+    v = v.replace(/\+/g, ' ');
+    try{ qs[k] = decodeURIComponent(v); }catch(e){ qs[k] = v; }
+  });
   AREA = String(qs.area || '').toLowerCase().replace(/[^a-z]/g, '');
   EMBEBIDO = qs.embebido ? '1' : '';
   USUARIO_LINK = String(qs.usuario || '').trim();
