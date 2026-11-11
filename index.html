@@ -671,6 +671,13 @@ body.embebido .wrap{padding-top:10px;}
 header#cab{background:transparent!important;box-shadow:none!important;padding:6px 16px!important;min-height:0!important;justify-content:flex-end}
 header#cab #logo,header#cab #divLogo,header#cab .htitulos{display:none!important}
 header#cab .yo,header#cab .atras{background:var(--card,#fff);color:var(--ink,#1A2B28);border:1px solid #C9D8D3}
+/* boton Menu discreto: abajo a la izquierda, no ocupa espacio arriba (11nov) */
+#btnAtras{position:fixed!important;left:12px!important;bottom:12px!important;top:auto!important;right:auto!important;z-index:40!important;margin:0!important;
+width:auto!important;min-height:0!important;padding:8px 14px!important;border-radius:999px!important;font-size:13px!important;font-weight:700!important;
+background:#fff!important;color:#0F7A5A!important;border:1px solid #C9D8D3!important;box-shadow:0 2px 10px rgba(14,59,54,.18)!important;opacity:.92;cursor:pointer;}
+#btnAtras:hover{opacity:1;}
+html[data-tema="oscuro"] #btnAtras{background:#112A25!important;color:#3CC495!important;border-color:#28463F!important;}
+@media print{#btnAtras{display:none!important;}}
 </style>
 <!-- ============================================================================
      LIVES · SESIÓN DEL PORTAL EN LAS HERRAMIENTAS            lives-sesion v5.2 · 2026-10-06
